@@ -56,13 +56,12 @@ def get_pet(account: plb.Account, name: str) -> plb.Pet | None:
     Returns None if no pet is found with the specified name
     """
     print("Pets:")
-    olive = None
     for pet in account.pets:
         print(pet)
-        if pet.name == "Olive":
-            olive = pet
+        if pet.name == name:
+            return pet
 
-    return olive
+    return None
 
 
 async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
