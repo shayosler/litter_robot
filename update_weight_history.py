@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # Read Olive's weight history from the litter robot
 # Update a Google sheet with new data
-
-
 import asyncio
 import os.path
 
@@ -63,7 +61,7 @@ def get_pet(account: plb.Account, name: str) -> plb.Pet | None:
     return olive
 
 
-async def get_weight_history(name: str) -> list[plb.WeightMeasurement]:
+async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
     # Create an account.
     account = plb.Account()
     weights = None
@@ -98,17 +96,23 @@ async def get_weight_history(name: str) -> list[plb.WeightMeasurement]:
 
 async def main():
     name = "Olive"
-    weights = get_weight_history(name)
-    if not weights:
-        print(f"Failed to get weight history for {name}")
-        return
+#    weights = get_weight_history(name)
+#    if not weights:
+#        print(f"Failed to get weight history for {name}")
+#        return
+
+    # Update google sheets
 
     try:
-        # Call the Sheets API
         sheet = setup_sheets()
+
+        # Get current data
+        # TODO: someday be smarter and only fetch the end of
+        # the weight history
+        start_row = 2
         result = (
             sheet.values()
-            .get(spreadsheetId=SPREADSHEET_ID, range=f"{name}!A2:B")
+            .get(spreadsheetId=SPREADSHEET_ID, range=f"{name}!A{start_row}:B")
             .execute()
         )
         values = result.get("values", [])
@@ -117,10 +121,13 @@ async def main():
             print("No data found.")
             return
 
+        rows = len(values)
+        print(f"{rows} rows")
         print("Date, Weight")
         for row in values:
-            # Print columns A and E, which correspond to indices 0 and 4.
             print(f"{row[0]}, {row[1]}")
+
+        next_row = start_row + rows
     except HttpError as err:
         print(err)
 
