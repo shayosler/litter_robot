@@ -3,6 +3,7 @@
 # Update a Google sheet with new data
 import asyncio
 import os.path
+from datetime import datetime, timezone
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -94,12 +95,34 @@ async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
     return weights
 
 
+def update_sheet_values(sheet, range_name, values, value_input_option="RAW"):
+    """
+    Update some cells in a spreadsheet
+    """
+    try:
+        body = {"values": values}
+        result = (
+            sheets.values().update(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption=value_input_option,
+                body=body,
+            )
+            .execute()
+        )
+        print(f"{result.get('updatedCells')} cells updated.")
+        return result
+    except HttpError as error:
+        print(f"An error occurred: {error}")
+        return error
+
+
 async def main():
     name = "Olive"
-#    weights = get_weight_history(name)
-#    if not weights:
-#        print(f"Failed to get weight history for {name}")
-#        return
+    weights = get_weight_history(name)
+    if not weights:
+        print(f"Failed to get weight history for {name}")
+        return
 
     # Update google sheets
 
@@ -109,7 +132,7 @@ async def main():
         # Get current data
         # TODO: someday be smarter and only fetch the end of
         # the weight history
-        start_row = 2
+        first_data_row = 2
         result = (
             sheet.values()
             .get(spreadsheetId=SPREADSHEET_ID, range=f"{name}!A{start_row}:B")
@@ -127,11 +150,42 @@ async def main():
         for row in values:
             print(f"{row[0]}, {row[1]}")
 
-        next_row = start_row + rows
+        # TODO: this assumes the data in the sheet stays sorted
+        last_row = values[-1]
+        last_timestamp = datetime.fromisoformat(last_row[0])
+
+        # Determine which weight measurements are new
+        new_measurements = []
+        for weight in weights:
+            if weight.timestamp > last_timestamp:
+                new_measurements.append(weight)
+            else:
+                print("Ignoring old measurement "
+                      f"{weight.timestamp.isoformat()}, "
+                      f"{weight.weight}")
+
+        # Append new measurements
+        if not new_measurements:
+            print("No new measurements")
+            return
+        # Determine range that new data will be entered in
+        first_new_row = first_data_row + rows
+        last_new_row = first_new_row + len(new_measurements)
+        new_range="{name}!A{first_new_row}:B{last_new_row}"
+
+        # TODO: if weights reported from litter robot are not
+        # sorted from earliest to latest then will need to sort
+        new_measurements.sort()
+        values = []
+        for m in new_measurements:
+            val = [m.timestamp.isoformat(), str(m.weight)]
+            values.append(val)
+            pass
+
+        update_sheet_values(sheet, new_range, values)
     except HttpError as err:
         print(err)
 
 
 if __name__ == "__main__":
-
     asyncio.run(main())
