@@ -1,3 +1,5 @@
 *_venv/
 *.pyc
 config.py
+credentials.json
+token.json
