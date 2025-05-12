@@ -68,7 +68,7 @@ async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
     weights = None
     try:
         # Connect to the API and load robots.
-        print(f"Connecting to account for {username}...")
+        print(f"Connecting to Litter Robot account for {username}...")
         await account.connect(username=username,
                               password=password,
                               load_robots=True,
@@ -82,8 +82,6 @@ async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
         olive = get_pet(account, name)
         if olive:
             weights = await olive.fetch_weight_history()
-            print(f"{name} weights:")
-            print(weights)
         else:
             print(f"Failed to find pet '{name}'")
     except:
@@ -102,8 +100,8 @@ def update_sheet_values(sheet, range_name, values, value_input_option="RAW"):
     try:
         body = {"values": values}
         result = (
-            sheets.values().update(
-                spreadsheetId=spreadsheet_id,
+            sheet.values().update(
+                spreadsheetId=SPREADSHEET_ID,
                 range=range_name,
                 valueInputOption=value_input_option,
                 body=body,
@@ -119,13 +117,17 @@ def update_sheet_values(sheet, range_name, values, value_input_option="RAW"):
 
 async def main():
     name = "Olive"
-    weights = get_weight_history(name)
+    weights = await get_weight_history(name)
     if not weights:
-        print(f"Failed to get weight history for {name}")
+        print(f"Failed to get weight measurements for {name}")
         return
 
-    # Update google sheets
+    print(f"{name} weight measurements:")
+    for weight in weights:
+        print(f"{weight.timestamp.isoformat()}, {weight.weight}")
+    print("")
 
+    # Update google sheets
     try:
         sheet = setup_sheets()
 
@@ -135,34 +137,38 @@ async def main():
         first_data_row = 2
         result = (
             sheet.values()
-            .get(spreadsheetId=SPREADSHEET_ID, range=f"{name}!A{start_row}:B")
+            .get(spreadsheetId=SPREADSHEET_ID,
+                 range=f"{name}!A{first_data_row}:B")
             .execute()
         )
         values = result.get("values", [])
 
-        if not values:
-            print("No data found.")
-            return
-
-        rows = len(values)
-        print(f"{rows} rows")
-        print("Date, Weight")
-        for row in values:
-            print(f"{row[0]}, {row[1]}")
-
-        # TODO: this assumes the data in the sheet stays sorted
-        last_row = values[-1]
-        last_timestamp = datetime.fromisoformat(last_row[0])
+        if values:
+            rows = len(values)
+            print("Stored data:")
+            print("Timestamp, Weight")
+            for row in values:
+                print(f"{row[0]}, {row[1]}")
+            # TODO: this assumes the data in the sheet stays sorted
+            last_row = values[-1]
+            last_timestamp = datetime.fromisoformat(last_row[0])
+        else:
+            rows = 0
+            last_timestamp = datetime.fromtimestamp(0,
+                                                    tz=timezone.utc)
 
         # Determine which weight measurements are new
         new_measurements = []
         for weight in weights:
             if weight.timestamp > last_timestamp:
                 new_measurements.append(weight)
+                print("Adding new  measurement "
+                      f"[{weight.timestamp.isoformat()}, "
+                      f"{weight.weight}]")
             else:
                 print("Ignoring old measurement "
-                      f"{weight.timestamp.isoformat()}, "
-                      f"{weight.weight}")
+                      f"[{weight.timestamp.isoformat()}, "
+                      f"{weight.weight}]")
 
         # Append new measurements
         if not new_measurements:
@@ -171,11 +177,11 @@ async def main():
         # Determine range that new data will be entered in
         first_new_row = first_data_row + rows
         last_new_row = first_new_row + len(new_measurements)
-        new_range="{name}!A{first_new_row}:B{last_new_row}"
+        new_range = f"{name}!A{first_new_row}:B{last_new_row}"
 
         # TODO: if weights reported from litter robot are not
         # sorted from earliest to latest then will need to sort
-        new_measurements.sort()
+        new_measurements.sort(key=lambda w: w.timestamp)
         values = []
         for m in new_measurements:
             val = [m.timestamp.isoformat(), str(m.weight)]
