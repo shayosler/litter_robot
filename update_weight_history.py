@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # Read Olive's weight history from the litter robot
 # Update a Google sheet with new data
+#
+# Uses https://github.com/natekspencer/pylitterbot/tree/main
+
 import asyncio
 import os.path
 from datetime import datetime, timezone
