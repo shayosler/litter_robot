@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # Read Olive's weight history from the litter robot
-# Update a Google sheet with new data
+# Updates a Google sheet with new data
+# Requires a file config.py that defines two variables, username and password
+# with the credentials for the litter robot account.
+# Requires a file credentials.json with the OAuth2 credentials for the sheets
+# API
 #
 # Uses https://github.com/natekspencer/pylitterbot/tree/main
 
