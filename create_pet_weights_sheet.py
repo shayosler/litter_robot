@@ -36,5 +36,8 @@ def create(title):
 
 
 if __name__ == "__main__":
-  # Pass: title
-  create("Pet Weights")
+    print("Sheet has already been created, "
+          "modify this if it needs to be recreated")
+    exit(0)
+    # Pass: title
+    create("Pet Weights")
