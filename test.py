@@ -3,10 +3,6 @@ import asyncio
 from config import username, password
 from pylitterbot import Account
 
-# Set email and password for initial authentication.
-#username = "Your username"
-#password = "Your password"
-
 
 async def main():
     # Create an account.
