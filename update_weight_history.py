@@ -12,6 +12,7 @@ import asyncio
 import os.path
 from datetime import datetime, timezone
 
+import google.auth
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -26,12 +27,26 @@ from config import username, password
 SPREADSHEET_ID = "1MfZeel4GIVfo-u4UpIzQ0s49yd-_1DnHFyGsok08-SE"
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
+def get_creds_automatic():
+    """
+    Automatic auth flow
+    Set GOOGLE_APPLICATION_CREDENTIALS environment variable to the location
+    of the credentials file for the service account to use
+    """
+    creds, _ = google.auth.default()
+    return creds
 
-def setup_sheets():
+
+def get_creds_manual():
     """
-    Set up the sheets API, authorizing if necessary
+    "Manual" authentication flow. Ask user to authenticate,
+    then cache credentials
     """
-    # Set up credentials
+
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    creds = None
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
         # If there are no (valid) credentials available, ask to log in
@@ -46,7 +61,14 @@ def setup_sheets():
             # Save the credentials for the next run
         with open("token.json", "w") as token:
             token.write(creds.to_json())
+    return creds
 
+
+def setup_sheets():
+    """
+    Set up the sheets API, authorizing if necessary
+    """
+    creds = get_creds_automatic()
     # Set up sheets API
     service = build("sheets", "v4", credentials=creds)
     sheet = service.spreadsheets()
