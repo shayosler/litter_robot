@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 # Read Olive's weight history from the litter robot
 # Updates a Google sheet with new data
-# Requires a file config.py that defines two variables, username and password
-# with the credentials for the litter robot account.
-# Requires a file credentials.json with the OAuth2 credentials for the sheets
-# API
+#
+# For Litter Robot authentication can come from either a file or environment
+# variables. The script will attempt to load variables lr_username and
+# lr_password from a file called lr_credentials.py. It will also look for
+# environment variables LITTER_ROBOT_USER and LITTER_ROBOT_PASSWORD. If either
+# environment variable is defined its value will be used. Otherwise the values
+# read from the file will be used.
+#
+# Google sheets authentication requires the environment variable
+# GOOGLE_APPLICATION_CREDENTIALS to point to a valid json file containing a key
+# for an account to use to access the Sheets API
+#
+# Alternatively, modify the script to use get_creds_manual(), which requires a
+# file credentials.json with the OAuth2 credentials for the Sheets API
 #
 # Uses https://github.com/natekspencer/pylitterbot/tree/main
 
@@ -21,11 +31,16 @@ from googleapiclient.errors import HttpError
 
 import pylitterbot as plb
 
-from config import username, password
+lr_username = "iwishiwuzskiing@gmail.com"
+lr_password = None
+try:
+    from lr_credentials import lr_username, lr_password
+except ImportError:
+    print("Did not find Litter Robot credentials file")
 
 
 SPREADSHEET_ID = "1MfZeel4GIVfo-u4UpIzQ0s49yd-_1DnHFyGsok08-SE"
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+
 
 def get_creds_automatic():
     """
@@ -47,6 +62,7 @@ def get_creds_manual():
     # created automatically when the authorization flow completes for the first
     # time.
     creds = None
+    SCOPES = ["https://www.googleapis.com/auth/drive.file"]
     if os.path.exists("token.json"):
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
         # If there are no (valid) credentials available, ask to log in
@@ -90,15 +106,17 @@ def get_pet(account: plb.Account, name: str) -> plb.Pet | None:
     return None
 
 
-async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
+async def get_weight_history(user: str,
+                             pw: str,
+                             pet_name: str):# -> list[plb.WeightMeasurement]:
     # Create an account.
     account = plb.Account()
     weights = None
     try:
         # Connect to the API and load robots.
-        print(f"Connecting to Litter Robot account for {username}...")
-        await account.connect(username=username,
-                              password=password,
+        print(f"Connecting to Litter Robot account for {user}...")
+        await account.connect(username=user,
+                              password=pw,
                               load_robots=True,
                               load_pets=True)
 
@@ -107,13 +125,13 @@ async def get_weight_history(name: str):# -> list[plb.WeightMeasurement]:
         for robot in account.robots:
             print(robot)
 
-        olive = get_pet(account, name)
+        olive = get_pet(account, pet_name)
         if olive:
             weights = await olive.fetch_weight_history()
         else:
-            print(f"Failed to find pet '{name}'")
+            print(f"Failed to find pet '{pet_name}'")
     except:
-        print(f"Failed to connect to account for {username}...")
+        print(f"Failed to connect to account for {user}...")
     finally:
         # Disconnect from the API.
         await account.disconnect()
@@ -140,15 +158,22 @@ def update_sheet_values(sheet, range_name, values, value_input_option="RAW"):
         return result
     except HttpError as error:
         print(f"An error occurred: {error}")
-        return error
+        raise
 
 
 async def main():
     name = "Olive"
-    weights = await get_weight_history(name)
+
+    env_lr_user = os.getenv("LITTER_ROBOT_USER")
+    env_lr_pw = os.getenv("LITTER_ROBOT_PASSWORD")
+    lr_u = env_lr_user if env_lr_user else lr_username
+    lr_pw = env_lr_pw if env_lr_pw else lr_password
+    weights = await get_weight_history(user=lr_u,
+                                       pw=lr_pw,
+                                       pet_name=name)
     if not weights:
         print(f"Failed to get weight measurements for {name}")
-        return
+        exit(1)
 
     print(f"{name} weight measurements:")
     for weight in weights:
@@ -219,6 +244,7 @@ async def main():
         update_sheet_values(sheet, new_range, values)
     except HttpError as err:
         print(err)
+        exit(1)
 
 
 if __name__ == "__main__":
