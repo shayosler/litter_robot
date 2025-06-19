@@ -40,6 +40,7 @@ except ImportError:
 
 
 SPREADSHEET_ID = "1MfZeel4GIVfo-u4UpIzQ0s49yd-_1DnHFyGsok08-SE"
+ROBOT_SERIAL = "LR4C515746"
 
 
 def get_creds_automatic():
@@ -124,6 +125,10 @@ async def get_weight_history(user: str,
         print("Robots:")
         for robot in account.robots:
             print(robot)
+            print(f"Is online: {robot.is_online}")
+            if robot.serial == ROBOT_SERIAL and not robot.is_online:
+                print("Robot is not online, exiting")
+                raise RuntimeError("Robot is not online")
 
         olive = get_pet(account, pet_name)
         if olive:
@@ -132,6 +137,7 @@ async def get_weight_history(user: str,
             print(f"Failed to find pet '{pet_name}'")
     except:
         print(f"Failed to connect to account for {user}...")
+        raise
     finally:
         # Disconnect from the API.
         await account.disconnect()
